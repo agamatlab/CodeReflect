@@ -1,107 +1,166 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 const vscode = require('vscode');
-
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
 
 /**
  * @param {vscode.ExtensionContext} context
  */
 function activate(context) {
-
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
 	console.log('Congratulations, your extension "codereflect" is now active!');
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with  registerCommand
-	// The commandId parameter must match the command field in package.json
-	const disposable = vscode.commands.registerCommand('codereflect.helloWorld', function () {
-		// The code you place here will be executed every time your command is executed
-
-		// Display a message box to the user
+	// Hello World command
+	const helloWorldCommand = vscode.commands.registerCommand('codereflect.helloWorld', function () {
 		vscode.window.showInformationMessage('Hello World from CodeReflect!');
 	});
+	context.subscriptions.push(helloWorldCommand);
 
-	context.subscriptions.push(disposable);
-}
+	// Server for receiver mode
+	let server;
 
-// This method is called when your extension is deactivated
-let server;
-vscode.commands.registerCommand('extension.StartReciever', () =>{
-	const net = require("net");
-	server = net.createServer((socket) => {
-		socket.on("data", (data) => {
-			compareAndHighlight(data.toString());
+	// Client for sender mode
+	let client;
+
+	// Decoration type for highlighting mismatches
+	const decorationType = vscode.window.createTextEditorDecorationType({
+		backgroundColor: 'rgba(255, 0, 0, 0.3)',
+		isWholeLine: true  // Highlight the entire line for better visibility
+	});
+
+	// Start Receiver command
+	const startReceiverCommand = vscode.commands.registerCommand('codereflect.startReceiver', () => {
+		const net = require("net");
+		server = net.createServer((socket) => {
+			socket.on("data", (data) => {
+				compareAndHighlight(data.toString(), decorationType);
+			});
+		});
+		server.listen(3030, "localhost", () => {
+			vscode.window.showInformationMessage("Receiver started on port 3030");
 		});
 	});
+	context.subscriptions.push(startReceiverCommand);
 
-	server.listen(3030, "localhost");
-	vscode.window.showInformationMessage("Reciever started on port 3030");
-})
-
-vscode.commands.registerCommand('extension.stopReceiver', () => {
-    if (server) {
-        server.close();
-        vscode.window.showInformationMessage('Receiver stopped');
-    }
-});
-
-let client;
-
-vscode.commands.registerCommand('extension.startSender', async () => {
-	const address = await vscode.window.showInputBox({prompt: "Enter reciever address (e.g., localhost:3030)"});
-	const [host, port] = address.split(':');;
-	const net = require("net")
-	client = net.connect('net');
-	clinet = net.connect(port,host, () =>{
-		vscode.window.showInformationMessage("Connected to reciever");
+	// Stop Receiver command
+	const stopReceiverCommand = vscode.commands.registerCommand('codereflect.stopReceiver', () => {
+		if (server) {
+			server.close();
+			vscode.window.showInformationMessage('Receiver stopped');
+			server = null;
+		} else {
+			vscode.window.showInformationMessage('No active receiver to stop');
+		}
 	});
-});
+	context.subscriptions.push(stopReceiverCommand);
 
-let timeout;
-vscode.workspace.onDidChangeTextDocument((event) => {
-    if (!client) return;
-    clearTimeout(timeout);
-    timeout = setTimeout(() => {
-        const text = event.document.getText();
-        client.write(text);
-    }, 500); // Wait 500ms before sending (debouncing)
-});
+	// Start Sender command
+	const startSenderCommand = vscode.commands.registerCommand('codereflect.startSender', async () => {
+		const address = await vscode.window.showInputBox({
+			prompt: "Enter receiver address (e.g., localhost:3030)",
+			placeHolder: "localhost:3030"
+		});
 
-vscode.commands.registerCommand('extension.stopSender', () => {
-    if (client) {
-        client.end();
-        vscode.window.showInformationMessage('Sender stopped');
-    }
-});
+		if (!address) return; // User cancelled input
 
-function compareAndHighlight(typedCode){
-	const editor = vscode.window.activeTextEditor;
-	if(!editor) return;
+		const [host, port] = address.split(':');
+		const net = require("net");
 
-	const referecneCode =  editor.document.getText();
-	const refLines =  referecneCode.split("\n");
-	const typedLines = typedCode.split('\n');
-	const decorations = [];
-
-	for(let i = 0; i < refLines.length; i++){
-		if(refLines[i] !== typedLines[i]){
-			decorations.push({
-				range: new vscode.Range(i, 0, refLines[i].length),
+		try {
+			client = net.connect(parseInt(port), host, () => {
+				vscode.window.showInformationMessage(`Connected to receiver at ${host}:${port}`);
 			});
+
+			client.on('error', (err) => {
+				vscode.window.showErrorMessage(`Connection error: ${err.message}`);
+				client = null;
+			});
+
+			client.on('close', () => {
+				vscode.window.showInformationMessage('Connection to receiver closed');
+				client = null;
+			});
+		} catch (error) {
+			vscode.window.showErrorMessage(`Failed to connect: ${error.message}`);
+		}
+	});
+	context.subscriptions.push(startSenderCommand);
+
+	// Stop Sender command
+	const stopSenderCommand = vscode.commands.registerCommand('codereflect.stopSender', () => {
+		if (client) {
+			client.end();
+			vscode.window.showInformationMessage('Sender stopped');
+			client = null;
+		} else {
+			vscode.window.showInformationMessage('No active sender to stop');
+		}
+	});
+	context.subscriptions.push(stopSenderCommand);
+
+	// Debounce timeout
+	let timeout;
+
+	// Listen for text changes to send to receiver
+	const textChangeListener = vscode.workspace.onDidChangeTextDocument((event) => {
+		if (!client) return;
+
+		clearTimeout(timeout);
+		timeout = setTimeout(() => {
+			const text = event.document.getText();
+			try {
+				// Add a special delimiter to ensure complete transmission
+				client.write(text);
+				console.log(`Sent ${text.split(/\r?\n/).length} lines to receiver`);
+			} catch (error) {
+				vscode.window.showErrorMessage(`Failed to send code: ${error.message}`);
+			}
+		}, 500); // Wait 500ms before sending (debouncing)
+	});
+	context.subscriptions.push(textChangeListener);
+}
+
+/**
+ * Compare typed code with reference code and highlight differences
+ * @param {string} typedCode 
+ * @param {vscode.TextEditorDecorationType} decorationType
+ */
+function compareAndHighlight(typedCode, decorationType) {
+	const editor = vscode.window.activeTextEditor;
+	if (!editor) return;
+
+	// Normalize line endings and get text
+	const referenceCode = editor.document.getText();
+	const refLines = referenceCode.split(/\r?\n/);
+	const typedLines = typedCode.split(/\r?\n/);
+
+	console.log(`Comparing: Ref lines: ${refLines.length}, Typed lines: ${typedLines.length}`);
+
+	const decorations = [];
+	const maxLines = Math.max(refLines.length, typedLines.length);
+
+	for (let i = 0; i < maxLines; i++) {
+		// Get lines or empty string if past the end of either file
+		const refLine = i < refLines.length ? refLines[i] : '';
+		const typedLine = i < typedLines.length ? typedLines[i] : '';
+
+		// Compare lines (trimmed to ignore whitespace differences)
+		if (refLine.trim() !== typedLine.trim()) {
+			// Make sure we don't exceed the document length
+			if (i < editor.document.lineCount) {
+				const line = editor.document.lineAt(i);
+				decorations.push({
+					range: line.range
+				});
+			}
 		}
 	}
 
-	const decorationType = vscode.window.createTextEditorDecorationType({
-		backgroundColor: 'rgba(255, 0, 0, 0.3)'
-	})
-
 	editor.setDecorations(decorationType, decorations);
-
 }
 
+/**
+ * This method is called when your extension is deactivated
+ */
+function deactivate() {
+	// Clean up resources
+}
 
 module.exports = {
 	activate,

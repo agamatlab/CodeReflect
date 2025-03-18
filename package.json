@@ -12,10 +12,28 @@
   "activationEvents": [],
   "main": "./extension.js",
   "contributes": {
-    "commands": [{
-      "command": "codereflect.helloWorld",
-      "title": "Hello World"
-    }]
+    "commands": [
+      {
+        "command": "codereflect.helloWorld",
+        "title": "CodeReflect: Hello World"
+      },
+      {
+        "command": "codereflect.startReceiver",
+        "title": "CodeReflect: Start Receiver"
+      },
+      {
+        "command": "codereflect.stopReceiver",
+        "title": "CodeReflect: Stop Receiver"
+      },
+      {
+        "command": "codereflect.startSender",
+        "title": "CodeReflect: Start Sender"
+      },
+      {
+        "command": "codereflect.stopSender",
+        "title": "CodeReflect: Stop Sender"
+      }
+    ]
   },
   "scripts": {
     "lint": "eslint .",
