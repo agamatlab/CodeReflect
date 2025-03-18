@@ -28,7 +28,51 @@ function activate(context) {
 }
 
 // This method is called when your extension is deactivated
-function deactivate() {}
+let server;
+vscode.commands.registerCommand('extension.StartReciever', () =>{
+	const net = require("net");
+	server = net.createServer((socket) => {
+		socket.on("data", (data) => {
+			compareAndHighlight(data.toString());
+		});
+	});
+
+	server.listen(3030, "localhost");
+	vscode.window.showInformationMessage("Reciever started on port 3030");
+})
+
+vscode.commands.registerCommand('extension.stopReceiver', () => {
+    if (server) {
+        server.close();
+        vscode.window.showInformationMessage('Receiver stopped');
+    }
+});
+
+function compareAndHighlight(typedCode){
+	const editor = vscode.window.activeTextEditor;
+	if(!editor) return;
+
+	const referecneCode =  editor.document.getText();
+	const refLines =  referecneCode.split("\n");
+	const typedLines = typedCode.split('\n');
+	const decorations = [];
+
+	for(let i = 0; i < refLines.length; i++){
+		if(refLines[i] !== typedLines[i]){
+			decorations.push({
+				range: new vscode.Range(i, 0, refLines[i].length),
+			});
+		}
+	}
+
+	const decorationType = vscode.window.createTextEditorDecorationType({
+		backgroundColor: 'rgba(255, 0, 0, 0.3)'
+	})
+
+	editor.setDecorations(decorationType, decorations);
+
+}
+
 
 module.exports = {
 	activate,
