@@ -1,0 +1,10 @@
+node_modules
+out
+coverage
+.vscode
+*.log
+*.tmp
+*.swp
+.DS_Store
+*.vsix
+tsconfig.tsbuildinfo
