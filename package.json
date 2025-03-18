@@ -1,11 +1,10 @@
 {
-  "displayName": "Code Reflect",
+  "displayName": "CodeReflect",
   "icon": "./codereflect.png",
   "name": "codereflect",
   "publisher": "Aghamatlab",
-  "displayName": "CodeReflect",
   "description": "",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "engines": {
     "vscode": "^1.98.0"
   },
