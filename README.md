@@ -1,12 +1,6 @@
 # CodeReflect
 
-<img src="/api/placeholder/600/120" alt="CodeReflect Banner" />
-
 ## Real-Time Code Comparison Tool for Programming Instructors
-
-[![VS Code Marketplace Version](https://img.shields.io/badge/vscode--marketplace-v0.1.0-blue)]()
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)]()
 
 CodeReflect is a VS Code extension designed to help programming instructors during live coding lectures. It enables real-time comparison between reference code and the code being typed, highlighting discrepancies immediately to improve the teaching experience and student comprehension.
 
@@ -19,8 +13,6 @@ CodeReflect is a VS Code extension designed to help programming instructors duri
 - **Flexible Setup**: Works across two VS Code windows, ideal for dual-monitor teaching setups
 - **Customizable**: Adjust highlight colors and comparison behavior to suit your needs
 - **Lightweight**: Minimal performance impact on VS Code
-
-<img src="/api/placeholder/800/400" alt="CodeReflect in action" />
 
 ---
 
@@ -112,7 +104,6 @@ npm run package
    - Explain concepts as you type, with instant visual feedback when you make a mistake
    - Students can see both your typed code and where it differs from the expected result
 
-<img src="/api/placeholder/800/400" alt="Teaching Setup Example" />
 
 ---
 
@@ -268,12 +259,6 @@ Future plans for CodeReflect include:
 - **Diff view integration**: Enhanced visualization of differences
 - **Remote teaching**: Support for remote connections (beyond localhost)
 - **Language-specific highlighting**: Special rules for different programming languages
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 

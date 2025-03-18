@@ -1,5 +1,8 @@
 {
+  "displayName": "Code Reflect",
+  "icon": "./codereflect.png",
   "name": "codereflect",
+  "publisher": "Aghamatlab",
   "displayName": "CodeReflect",
   "description": "",
   "version": "0.0.1",
