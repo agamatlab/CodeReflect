@@ -48,6 +48,35 @@ vscode.commands.registerCommand('extension.stopReceiver', () => {
     }
 });
 
+let client;
+
+vscode.commands.registerCommand('extension.startSender', async () => {
+	const address = await vscode.window.showInputBox({prompt: "Enter reciever address (e.g., localhost:3030)"});
+	const [host, port] = address.split(':');;
+	const net = require("net")
+	client = net.connect('net');
+	clinet = net.connect(port,host, () =>{
+		vscode.window.showInformationMessage("Connected to reciever");
+	});
+});
+
+let timeout;
+vscode.workspace.onDidChangeTextDocument((event) => {
+    if (!client) return;
+    clearTimeout(timeout);
+    timeout = setTimeout(() => {
+        const text = event.document.getText();
+        client.write(text);
+    }, 500); // Wait 500ms before sending (debouncing)
+});
+
+vscode.commands.registerCommand('extension.stopSender', () => {
+    if (client) {
+        client.end();
+        vscode.window.showInformationMessage('Sender stopped');
+    }
+});
+
 function compareAndHighlight(typedCode){
 	const editor = vscode.window.activeTextEditor;
 	if(!editor) return;
