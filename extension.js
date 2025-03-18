@@ -21,7 +21,7 @@ function activate(context) {
 	// Decoration type for highlighting mismatches
 	const decorationType = vscode.window.createTextEditorDecorationType({
 		backgroundColor: 'rgba(255, 0, 0, 0.3)',
-		isWholeLine: true  // Highlight the entire line for better visibility
+		isWholeLine: false  // Highlight the entire line for better visibility
 	});
 
 	// Start Receiver command
@@ -125,30 +125,49 @@ function compareAndHighlight(typedCode, decorationType) {
 	const editor = vscode.window.activeTextEditor;
 	if (!editor) return;
 
-	// Normalize line endings and get text
+	// Normalize line endings
 	const referenceCode = editor.document.getText();
 	const refLines = referenceCode.split(/\r?\n/);
 	const typedLines = typedCode.split(/\r?\n/);
 
 	console.log(`Comparing: Ref lines: ${refLines.length}, Typed lines: ${typedLines.length}`);
 
+	// Clear previous decorations
+	editor.setDecorations(decorationType, []);
+
 	const decorations = [];
 	const maxLines = Math.max(refLines.length, typedLines.length);
 
 	for (let i = 0; i < maxLines; i++) {
+		// Skip if beyond document bounds
+		if (i >= editor.document.lineCount) continue;
+
 		// Get lines or empty string if past the end of either file
 		const refLine = i < refLines.length ? refLines[i] : '';
 		const typedLine = i < typedLines.length ? typedLines[i] : '';
 
-		// Compare lines (trimmed to ignore whitespace differences)
-		if (refLine.trim() !== typedLine.trim()) {
-			// Make sure we don't exceed the document length
-			if (i < editor.document.lineCount) {
-				const line = editor.document.lineAt(i);
-				decorations.push({
-					range: line.range
-				});
-			}
+		// Find where they differ
+		const minLength = Math.min(refLine.length, typedLine.length);
+		let diffIndex = 0;
+
+		// Find first differing character
+		while (diffIndex < minLength && refLine[diffIndex] === typedLine[diffIndex]) {
+			diffIndex++;
+		}
+
+		// Decide if we need to highlight
+		const lineDiffers = diffIndex < minLength || refLine.length !== typedLine.length;
+
+		if (lineDiffers) {
+			// Create a range from the differing character to the end of line
+			const startPosition = new vscode.Position(i, diffIndex);
+			const endPosition = new vscode.Position(i, refLine.length);
+
+			decorations.push({
+				range: new vscode.Range(startPosition, endPosition)
+			});
+
+			console.log(`Line ${i + 1}: Difference starts at character ${diffIndex + 1}`);
 		}
 	}
 
