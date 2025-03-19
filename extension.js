@@ -1,4 +1,6 @@
 const vscode = require('vscode');
+const net = require("net");
+const os = require("os");
 
 /**
  * @param {vscode.ExtensionContext} context
@@ -24,17 +26,73 @@ function activate(context) {
 		isWholeLine: false  // Highlight the entire line for better visibility
 	});
 
+	// Helper function to get local IP addresses
+	function getLocalIpAddresses() {
+		const interfaces = os.networkInterfaces();
+		const addresses = [];
+		
+		for (const interfaceName in interfaces) {
+			for (const iface of interfaces[interfaceName]) {
+				// Skip over non-IPv4 and internal (loopback) addresses
+				if (iface.family === 'IPv4' && !iface.internal) {
+					addresses.push(iface.address);
+				}
+			}
+		}
+		
+		return addresses;
+	}
+
 	// Start Receiver command
-	const startReceiverCommand = vscode.commands.registerCommand('codereflect.startReceiver', () => {
-		const net = require("net");
+	const startReceiverCommand = vscode.commands.registerCommand('codereflect.startReceiver', async () => {
+		const port = await vscode.window.showInputBox({
+			prompt: "Enter port to listen on",
+			placeHolder: "3030",
+			value: "3030"
+		});
+
+		if (!port) return; // User cancelled input
+
 		server = net.createServer((socket) => {
+			// Show connection info when a client connects
+			vscode.window.showInformationMessage(`Client connected from ${socket.remoteAddress}:${socket.remotePort}`);
+			
 			socket.on("data", (data) => {
 				compareAndHighlight(data.toString(), decorationType);
 			});
+			
+			socket.on("close", () => {
+				vscode.window.showInformationMessage(`Client disconnected: ${socket.remoteAddress}:${socket.remotePort}`);
+			});
+			
+			socket.on("error", (err) => {
+				vscode.window.showErrorMessage(`Socket error: ${err.message}`);
+			});
 		});
-		server.listen(3030, "localhost", () => {
-			vscode.window.showInformationMessage("Receiver started on port 3030");
-		});
+		
+		try {
+			// Listen on all network interfaces (0.0.0.0) instead of just localhost
+			server.listen(parseInt(port), "0.0.0.0", () => {
+				const ipAddresses = getLocalIpAddresses();
+				
+				// Display all available IP addresses to connect to
+				if (ipAddresses.length > 0) {
+					const addressList = ipAddresses.map(ip => `${ip}:${port}`).join(', ');
+					vscode.window.showInformationMessage(
+						`Receiver started. Your network addresses: ${addressList}`
+					);
+				} else {
+					vscode.window.showInformationMessage(`Receiver started on port ${port}, but no network interfaces detected`);
+				}
+			});
+			
+			server.on("error", (err) => {
+				vscode.window.showErrorMessage(`Server error: ${err.message}`);
+				server = null;
+			});
+		} catch (error) {
+			vscode.window.showErrorMessage(`Failed to start receiver: ${error.message}`);
+		}
 	});
 	context.subscriptions.push(startReceiverCommand);
 
@@ -53,18 +111,30 @@ function activate(context) {
 	// Start Sender command
 	const startSenderCommand = vscode.commands.registerCommand('codereflect.startSender', async () => {
 		const address = await vscode.window.showInputBox({
-			prompt: "Enter receiver address (e.g., localhost:3030)",
-			placeHolder: "localhost:3030"
+			prompt: "Enter receiver address (e.g., 192.168.1.5:3030)",
+			placeHolder: "192.168.1.5:3030"
 		});
 
 		if (!address) return; // User cancelled input
 
 		const [host, port] = address.split(':');
-		const net = require("net");
+		
+		if (!host || !port) {
+			vscode.window.showErrorMessage('Invalid address format. Use format: host:port');
+			return;
+		}
 
 		try {
 			client = net.connect(parseInt(port), host, () => {
 				vscode.window.showInformationMessage(`Connected to receiver at ${host}:${port}`);
+				
+				// Send the current document immediately after connecting
+				const editor = vscode.window.activeTextEditor;
+				if (editor) {
+					const text = editor.document.getText();
+					client.write(text);
+					console.log(`Sent initial document (${text.split(/\r?\n/).length} lines) to receiver`);
+				}
 			});
 
 			client.on('error', (err) => {
@@ -105,11 +175,15 @@ function activate(context) {
 		timeout = setTimeout(() => {
 			const text = event.document.getText();
 			try {
-				// Add a special delimiter to ensure complete transmission
 				client.write(text);
 				console.log(`Sent ${text.split(/\r?\n/).length} lines to receiver`);
 			} catch (error) {
 				vscode.window.showErrorMessage(`Failed to send code: ${error.message}`);
+				// Attempt to reconnect if the connection was lost
+				if (client) {
+					client.end();
+					client = null;
+				}
 			}
 		}, 500); // Wait 500ms before sending (debouncing)
 	});
@@ -179,6 +253,15 @@ function compareAndHighlight(typedCode, decorationType) {
  */
 function deactivate() {
 	// Clean up resources
+	if (client) {
+		client.end();
+		client = null;
+	}
+	
+	if (server) {
+		server.close();
+		server = null;
+	}
 }
 
 module.exports = {
